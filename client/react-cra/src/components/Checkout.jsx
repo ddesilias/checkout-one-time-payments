@@ -22,18 +22,23 @@ const Checkout = () => {
   const [quantity, setQuantity] = useState(1);
   const [amount, setAmount] = useState(0);
   const [currency, setCurrency] = useState('USD');
+  const [configReady, setConfigReady] = useState(false);
+  const [configError, setConfigError] = useState('');
 
   useEffect(() => {
     async function fetchConfig() {
       // Fetch config from our backend.
-      const {
-        unitAmount,
-        currency
-      } = await fetch('/api/config').then(r => r.json());
+      const response = await fetch('/api/config');
+      if (!response.ok) throw new Error('Payment configuration unavailable');
+      const { unitAmount, currency } = await response.json();
+      if (!Number.isFinite(unitAmount) || typeof currency !== 'string') {
+        throw new Error('Invalid payment configuration');
+      }
       setAmount(unitAmount);
       setCurrency(currency);
+      setConfigReady(true);
     }
-    fetchConfig();
+    fetchConfig().catch(() => setConfigError('Paiement indisponible dans cette démonstration.'));
   }, []);
 
   return (
@@ -52,7 +57,8 @@ const Checkout = () => {
               />
             </div>
           </div>
-          <form action="/api/create-checkout-session" method="POST">
+          {configError && <p role="status">{configError}</p>}
+          <form action="/api/create-checkout-session" method="POST" onSubmit={event => { if (!configReady) event.preventDefault(); }}>
             <div className="quantity-setter">
               <button
                 className="increment-btn"
@@ -82,8 +88,8 @@ const Checkout = () => {
             </div>
             <p className="sr-legal-text">Number of copies (max 10)</p>
 
-            <button role="link" id="submit" type="submit">
-              Buy {formatPrice({amount, currency, quantity})}
+            <button role="link" id="submit" type="submit" disabled={!configReady}>
+              {configReady ? `Buy ${formatPrice({amount, currency, quantity})}` : 'Paiement indisponible'}
             </button>
           </form>
         </section>
